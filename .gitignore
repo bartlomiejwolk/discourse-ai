@@ -8,3 +8,9 @@ config/eval-llms.local.yml
 # this gets rid of search results from ag, ripgrep, etc
 tokenizers/
 public/ai-share/highlight.min.js
+.aider*
+/.llm/context.md
+/.llm/list-files-output.md
+/.llm/search-files-output.md
+/.llm/summary.md
+/commands.txt
