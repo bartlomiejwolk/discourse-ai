@@ -225,28 +225,51 @@ class EmbeddingDefinition < ActiveRecord::Base
     )
 
     client.define_singleton_method(:perform!) do |input|
-      request = {
+      # Log full request details
+      request_details = {
         model: model_name,
-        # Truncate to first 100 characters (97 chars + "...") to avoid logging large texts
-        input: input.size > 100 ? "#{input[0..96]}..." : input,
+        input: input,  # Now logging full input
+        input_length: input.length,
         dimensions: client_dimensions,
-        url: endpoint
+        url: endpoint,
+        timestamp: Time.now.iso8601
       }
-      embedding_definition.log_embedding_data("OpenAI Request", request)
+      Rails.logger.debug("[Embeddings] OpenAI Full Request: #{request_details.inspect}")
+      
+      # Still log truncated version to main logs
+      truncated_request = request_details.merge(
+        input: input.size > 100 ? "#{input[0..96]}..." : input
+      )
+      embedding_definition.log_embedding_data("OpenAI Request", truncated_request)
       
       start_time = Time.now
-      response = super(input)
+      begin
+        response = super(input)
+      rescue => e
+        Rails.logger.error("[Embeddings] OpenAI API Error: #{e.class} - #{e.message}\nInput: #{input.inspect}")
+        raise
+      end
+      
       duration = ((Time.now - start_time) * 1000).round(2)
 
-      response_log_data = { model: model_name, duration_ms: duration }
+      response_log_data = { 
+        model: model_name, 
+        duration_ms: duration,
+        input_length: input.length
+      }
 
       if response
         response_log_data[:dimensions] = response.size
         response_log_data[:sample_embedding] = response[0..99].inspect
       else
-        response_log_data[:dimensions] = "N/A (nil response)"
-        response_log_data[:sample_embedding] = "N/A (nil response)"
-        Rails.logger.warn("[Embeddings] OpenAI perform! returned nil for input: #{input.inspect}")
+        response_log_data[:error] = "Nil response"
+        Rails.logger.error("[Embeddings] OpenAI perform! returned nil for input. Full details:\n" +
+          "Model: #{model_name}\n" +
+          "Input length: #{input.length}\n" +
+          "Dimensions: #{client_dimensions}\n" +
+          "URL: #{endpoint}\n" +
+          "First 500 chars: #{input[0..499].inspect}"
+        )
       end
       
       embedding_definition.log_embedding_data("OpenAI Response", response_log_data)
