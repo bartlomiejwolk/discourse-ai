@@ -234,7 +234,7 @@ class EmbeddingDefinition < ActiveRecord::Base
         url: endpoint,
         timestamp: Time.now.iso8601
       }
-      Rails.logger.info("[Embeddings] OpenAI Full Request: #{request_details.inspect}")
+      Rails.logger.error("[Embeddings] OpenAI Full Request: #{request_details.inspect}")
       
       # Also log truncated version
       truncated_request = request_details.merge(
