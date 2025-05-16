@@ -13,15 +13,15 @@ module ::DiscourseAi
       attr_reader :endpoint, :api_key, :model, :dimensions
 
       def perform!(content)
-        headers = { "Content-Type" => "application/json" }
+        headers = {
+          "Content-Type" => "application/json",
+          "Authorization" => "Bearer #{api_key}"
+        }
 
-        if endpoint.include?("azure")
-          headers["api-key"] = api_key
-        else
-          headers["Authorization"] = "Bearer #{api_key}"
-        end
-
-        payload = { model: model, input: content }
+        payload = { 
+          model: model, 
+          prompt: content  # Ollama uses 'prompt' instead of 'input'
+        }
         payload[:dimensions] = dimensions if dimensions.present?
 
         conn = Faraday.new { |f| f.adapter FinalDestination::FaradayAdapter }
@@ -29,12 +29,13 @@ module ::DiscourseAi
 
         case response.status
         when 200
-          JSON.parse(response.body, symbolize_names: true).dig(:data, 0, :embedding)
+          json = JSON.parse(response.body, symbolize_names: true)
+          json[:embedding] or raise "Invalid Ollama response: missing embedding field"
         when 429
-          # TODO add a AdminDashboard Problem?
+          nil # Rate limited
         else
           Rails.logger.warn(
-            "OpenAI Embeddings failed with status: #{response.status} body: #{response.body}",
+            "Ollama Embeddings failed with status: #{response.status} body: #{response.body}",
           )
           raise Net::HTTPBadResponse.new(response.body.to_s)
         end
