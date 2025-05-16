@@ -188,8 +188,6 @@ class EmbeddingDefinition < ActiveRecord::Base
     end
   end
 
-  private
-
   def log_embedding_data(type, data)
     # Redact sensitive info like API keys
     logged_data = data.dup
@@ -198,6 +196,8 @@ class EmbeddingDefinition < ActiveRecord::Base
   rescue => e
     Rails.logger.error("[Embeddings] Error logging #{type}: #{e}")
   end
+
+  private
 
   def strategy
     @strategy ||= DiscourseAi::Embeddings::Strategies::Truncation.new
@@ -216,6 +216,7 @@ class EmbeddingDefinition < ActiveRecord::Base
     model_name = lookup_custom_param("model_name")
     
     endpoint = endpoint_url
+    embedding_definition = self
     client = DiscourseAi::Inference::OpenAiEmbeddings.new(
       endpoint,
       api_key,
@@ -231,13 +232,13 @@ class EmbeddingDefinition < ActiveRecord::Base
         dimensions: client_dimensions,
         url: endpoint
       }
-      log_embedding_data("OpenAI Request", request)
+      embedding_definition.log_embedding_data("OpenAI Request", request)
       
       start_time = Time.now
       response = super(input)
       duration = ((Time.now - start_time) * 1000).round(2)
       
-      log_embedding_data("OpenAI Response", {
+      embedding_definition.log_embedding_data("OpenAI Response", {
         model: model_name,
         dimensions: response.size,
         duration_ms: duration,
