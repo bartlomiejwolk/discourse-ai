@@ -215,8 +215,9 @@ class EmbeddingDefinition < ActiveRecord::Base
     client_dimensions = matryoshka_dimensions ? dimensions : nil
     model_name = lookup_custom_param("model_name")
     
+    endpoint = endpoint_url
     client = DiscourseAi::Inference::OpenAiEmbeddings.new(
-      endpoint_url,
+      endpoint,
       api_key,
       model_name,
       client_dimensions,
@@ -228,7 +229,7 @@ class EmbeddingDefinition < ActiveRecord::Base
         # Truncate to first 100 characters (97 chars + "...") to avoid logging large texts
         input: input.size > 100 ? "#{input[0..96]}..." : input,
         dimensions: client_dimensions,
-        url: endpoint_url
+        url: endpoint
       }
       log_embedding_data("OpenAI Request", request)
       
