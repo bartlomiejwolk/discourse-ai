@@ -237,13 +237,19 @@ class EmbeddingDefinition < ActiveRecord::Base
       start_time = Time.now
       response = super(input)
       duration = ((Time.now - start_time) * 1000).round(2)
+
+      response_log_data = { model: model_name, duration_ms: duration }
+
+      if response
+        response_log_data[:dimensions] = response.size
+        response_log_data[:sample_embedding] = response[0..99].inspect
+      else
+        response_log_data[:dimensions] = "N/A (nil response)"
+        response_log_data[:sample_embedding] = "N/A (nil response)"
+        Rails.logger.warn("[Embeddings] OpenAI perform! returned nil for input: #{input.inspect}")
+      end
       
-      embedding_definition.log_embedding_data("OpenAI Response", {
-        model: model_name,
-        dimensions: response.size,
-        duration_ms: duration,
-        sample_embedding: response[0..99].inspect
-      })
+      embedding_definition.log_embedding_data("OpenAI Response", response_log_data)
       response
     end
 
