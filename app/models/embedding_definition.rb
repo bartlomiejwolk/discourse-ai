@@ -225,18 +225,18 @@ class EmbeddingDefinition < ActiveRecord::Base
     )
 
     client.define_singleton_method(:perform!) do |input|
-      # Log full request details
+      # Log full request details - always log at info level when we might need to debug
       request_details = {
         model: model_name,
-        input: input,  # Now logging full input
+        input: input,
         input_length: input.length,
         dimensions: client_dimensions,
         url: endpoint,
         timestamp: Time.now.iso8601
       }
-      Rails.logger.debug("[Embeddings] OpenAI Full Request: #{request_details.inspect}")
+      Rails.logger.info("[Embeddings] OpenAI Full Request: #{request_details.inspect}")
       
-      # Still log truncated version to main logs
+      # Also log truncated version
       truncated_request = request_details.merge(
         input: input.size > 100 ? "#{input[0..96]}..." : input
       )
@@ -246,7 +246,7 @@ class EmbeddingDefinition < ActiveRecord::Base
       begin
         response = super(input)
       rescue => e
-        Rails.logger.error("[Embeddings] OpenAI API Error: #{e.class} - #{e.message}\nInput: #{input.inspect}")
+        Rails.logger.error("[Embeddings] OpenAI API Error: #{e.class} - #{e.message}\nFull request details: #{request_details.inspect}")
         raise
       end
       
@@ -263,11 +263,7 @@ class EmbeddingDefinition < ActiveRecord::Base
         response_log_data[:sample_embedding] = response[0..99].inspect
       else
         response_log_data[:error] = "Nil response"
-        Rails.logger.error("[Embeddings] OpenAI perform! returned nil for input. Full details:\n" +
-          "Model: #{model_name}\n" +
-          "Input length: #{input.length}\n" +
-          "Dimensions: #{client_dimensions}\n" +
-          "URL: #{endpoint}\n" +
+        Rails.logger.error("[Embeddings] OpenAI perform! returned nil for input. Full request details:\n#{request_details.inspect}\n" +
           "First 500 chars: #{input[0..499].inspect}"
         )
       end
