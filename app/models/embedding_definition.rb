@@ -190,6 +190,15 @@ class EmbeddingDefinition < ActiveRecord::Base
 
   private
 
+  def log_embedding_data(type, data)
+    # Redact sensitive info like API keys
+    logged_data = data.dup
+    logged_data[:api_key] = "[REDACTED]" if logged_data[:api_key]
+    Rails.logger.debug("[Embeddings] #{type}: #{logged_data.inspect}")
+  rescue => e
+    Rails.logger.error("[Embeddings] Error logging #{type}: #{e}")
+  end
+
   def strategy
     @strategy ||= DiscourseAi::Embeddings::Strategies::Truncation.new
   end
@@ -204,13 +213,39 @@ class EmbeddingDefinition < ActiveRecord::Base
 
   def open_ai_client
     client_dimensions = matryoshka_dimensions ? dimensions : nil
-
-    DiscourseAi::Inference::OpenAiEmbeddings.new(
+    model_name = lookup_custom_param("model_name")
+    
+    client = DiscourseAi::Inference::OpenAiEmbeddings.new(
       endpoint_url,
       api_key,
-      lookup_custom_param("model_name"),
+      model_name,
       client_dimensions,
     )
+
+    client.define_singleton_method(:perform!) do |input|
+      request = {
+        model: model_name,
+        # Truncate to first 100 characters (97 chars + "...") to avoid logging large texts
+        input: input.size > 100 ? "#{input[0..96]}..." : input,
+        dimensions: client_dimensions,
+        url: endpoint_url
+      }
+      log_embedding_data("OpenAI Request", request)
+      
+      start_time = Time.now
+      response = super(input)
+      duration = ((Time.now - start_time) * 1000).round(2)
+      
+      log_embedding_data("OpenAI Response", {
+        model: model_name,
+        dimensions: response.size,
+        duration_ms: duration,
+        sample_embedding: response[0..99].inspect
+      })
+      response
+    end
+
+    client
   end
 
   def gemini_client
