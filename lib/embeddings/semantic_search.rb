@@ -67,7 +67,7 @@ module DiscourseAi
       # if the user filtered the results or index is a bit out of date
       OVER_SELECTION_FACTOR = 4
 
-      def search_for_topics(query, page = 1, hyde: false)
+      def search_for_topics(query, page = 1, hyde: true)
         max_results_per_page = 100
         limit = [Search.per_filter, max_results_per_page].min + 1
         offset = (page - 1) * limit
